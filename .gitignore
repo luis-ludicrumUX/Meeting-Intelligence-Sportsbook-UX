@@ -1,0 +1,9 @@
+# Meeting data and transcripts stay out of Git
+data/
+exports/
+transcripts/
+*.vtt
+*.srt
+*.docx
+meeting-intelligence-*.json
+.DS_Store

@@ -1,0 +1,771 @@
+<title>Sportsbook Meeting Intelligence</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rowdies:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: GemBet V5 navy app shell. Top bar (Meetings / Overview / Import), meeting switcher by date, per-meeting tabs. */
+:root{
+  --bg:#020a2b; --surface:#061650; --surface-2:#0a1f6b; --line:#1c3285; --line-soft:#13266e;
+  --fg:#e0eafd; --muted:#9bb8f2; --dim:#6e86c6;
+  --accent:#4a74ff; --accent-strong:#1742d5; --magenta:#e04ad8;
+  --crit:#ff5c7a; --high:#ff9f4d; --med:#f2c94c; --low:#3fd39a;
+  --font-display:"Rowdies", "Trebuchet MS", system-ui, sans-serif;
+  --font-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:10px;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-body);font-size:14px;line-height:1.5;margin:0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.wrap{max-width:1240px;margin:0 auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+/* Top bar */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:linear-gradient(180deg,#041247,var(--bg));border-bottom:1px solid var(--line-soft)}
+.top .wrap{display:flex;align-items:center;gap:20px;padding-block:12px;flex-wrap:wrap}
+.brand b{font-family:var(--font-display);font-weight:700;font-size:16px;white-space:nowrap}
+.brand span{display:block;font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.12em}
+.nav{display:flex;gap:4px}
+.nav button{all:unset;cursor:pointer;padding:7px 12px;border-radius:8px;color:var(--muted);font-size:13.5px}
+.nav button:hover{background:var(--surface);color:var(--fg)}
+.nav button[aria-current="page"]{background:var(--surface-2);color:var(--fg);box-shadow:inset 0 -2px 0 var(--magenta)}
+.status-dot{margin-left:auto;font-size:11.5px;color:var(--dim);display:flex;align-items:center;gap:6px}
+.status-dot i{width:7px;height:7px;border-radius:50%;background:var(--low)}
+.status-dot i.off{background:var(--crit)}
+.main{display:flex;flex-direction:column;gap:18px;padding-block:20px 60px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.head h1{font-family:var(--font-display);font-weight:400;font-size:25px;margin:0;line-height:1.15;text-wrap:balance}
+.head .sub{color:var(--muted);font-size:13px;margin-top:4px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:6px 12px;font-size:13px;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.primary{background:var(--accent-strong);border-color:var(--accent-strong)}
+.btn.primary:hover:not(:disabled){background:var(--accent)}
+.btn.ghost{background:transparent}
+.btn.danger{border-color:var(--crit);color:var(--crit);background:transparent}
+.btn.icon{padding:6px 8px}
+.btn svg{width:14px;height:14px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{all:unset;cursor:pointer;padding:6px 12px;font-size:13px;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface-2);color:var(--fg)}
+.sel,.inp{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;min-width:0}
+.inp::placeholder{color:var(--dim)}
+.panel{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--r);padding:16px;min-width:0}
+.panel h2{margin:0 0 10px;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
+.grid2{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+.muted{color:var(--muted)} .dim{color:var(--dim)}
+.empty{color:var(--dim);font-size:13px;padding:6px 0}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;border-radius:999px;padding:2px 9px;border:1px solid var(--line);color:var(--muted);white-space:nowrap;line-height:1.5}
+.pri{font-weight:600}
+.pri::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.pri.Critical{color:var(--crit);border-color:color-mix(in oklab,var(--crit) 45%,transparent)}
+.pri.High{color:var(--high);border-color:color-mix(in oklab,var(--high) 45%,transparent)}
+.pri.Medium{color:var(--med);border-color:color-mix(in oklab,var(--med) 45%,transparent)}
+.pri.Low{color:var(--low);border-color:color-mix(in oklab,var(--low) 45%,transparent)}
+.cert.Confirmed{background:var(--accent-strong);border-color:var(--accent-strong);color:#fff}
+.cert.Proposed{border-color:var(--accent);color:var(--fg)}
+.cert.Inferred{border-style:dashed;font-style:italic}
+.cert.Needs{border-color:var(--med);color:var(--med)}
+.cert.Needs::before{content:"!";font-weight:700}
+.status{background:var(--surface-2);border-color:transparent;color:var(--fg)}
+.status.Completed,.status.Resolved,.status.Done{color:var(--low)}
+.status.Blocked{color:var(--crit)}
+.chip.overdue{color:var(--crit);border-color:var(--crit)}
+.chip.kind{border-style:dotted}
+.type{font-weight:600;letter-spacing:.02em}
+.type.pm{color:#cfe0ff;border-color:var(--accent);background:color-mix(in oklab,var(--accent-strong) 35%,transparent)}
+.type.ux{color:#f6d4f3;border-color:var(--magenta);background:color-mix(in oklab,var(--magenta) 22%,transparent)}
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.kpi b{font-family:var(--font-display);font-size:28px;font-weight:400;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.kpi.alert b{color:var(--crit)}
+/* Meeting switcher */
+.switcher{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--r);padding:12px}
+.switcher .row1{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.switcher .sel{flex:1;min-width:200px;max-width:460px}
+.dates{display:flex;gap:6px;overflow-x:auto;scrollbar-width:thin;padding-bottom:2px}
+.dt{all:unset;cursor:pointer;flex:none;display:flex;flex-direction:column;gap:1px;padding:7px 12px;border-radius:8px;border:1px solid var(--line-soft);background:var(--bg);min-width:84px}
+.dt:hover{border-color:var(--line)}
+.dt[aria-pressed="true"]{border-color:var(--accent);background:var(--surface-2)}
+.dt .d{font-family:var(--font-mono);font-size:12.5px;color:var(--fg)}
+.dt .w{font-size:10.5px;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;gap:5px}
+.dt .w i{width:7px;height:7px;border-radius:50%;display:inline-block}
+.dt .w i.pm{background:var(--accent)} .dt .w i.ux{background:var(--magenta)}
+.dt .w i.pend{outline:1px dashed var(--med);outline-offset:1px}
+/* Meeting header + tabs */
+.mhead{display:flex;flex-direction:column;gap:8px}
+.factrow{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12.5px;color:var(--muted)}
+.factrow b{color:var(--fg);font-weight:500}
+.tabs{display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--line-soft);scrollbar-width:thin}
+.tabs button{all:unset;cursor:pointer;padding:9px 12px;font-size:13px;color:var(--muted);white-space:nowrap;border-bottom:2px solid transparent}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--magenta)}
+.tabs button .count{font-family:var(--font-mono);font-size:11px;color:var(--dim);margin-left:5px}
+.take{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.list{display:flex;flex-direction:column}
+.item{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line-soft);min-width:0}
+.item:first-child{border-top:0;padding-top:2px}
+.item .body{flex:1;min-width:0}
+.item .t{font-weight:500}
+.item .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px;align-items:center;font-size:12px;color:var(--dim)}
+.linkish{all:unset;cursor:pointer;color:var(--fg)}
+.linkish:hover{color:var(--accent);text-decoration:underline}
+.mcard{border:1px solid var(--line);border-radius:var(--r);padding:16px;background:linear-gradient(160deg,var(--surface-2),var(--surface) 60%);display:flex;flex-direction:column;gap:10px}
+.mcard h3{font-family:var(--font-display);font-size:18px;font-weight:400;margin:0}
+.stats{display:flex;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.stats b{font-family:var(--font-mono);color:var(--fg);font-weight:500;margin-right:4px}
+.pending{border:1px dashed var(--line);border-radius:var(--r);padding:14px;color:var(--muted);font-size:13px;display:flex;flex-direction:column;gap:10px}
+.sectionlbl{margin:6px 0 0;font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:8px}
+/* Tables */
+.tablewrap{overflow-x:auto;border:1px solid var(--line-soft);border-radius:var(--r)}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:820px}
+th{text-align:left;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);padding:10px 12px;background:var(--surface);border-bottom:1px solid var(--line-soft);white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid var(--line-soft);vertical-align:top}
+tr:last-child td{border-bottom:0}
+tr.isover td{background:color-mix(in oklab,var(--crit) 8%,transparent)}
+tr.isdone td{opacity:.55}
+td .sel{padding:3px 6px;font-size:12px}
+.check{width:16px;height:16px;accent-color:var(--low)}
+/* Cards */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.card .t{font-weight:600}
+.kv{display:grid;grid-template-columns:110px minmax(0,1fr);gap:4px 10px;font-size:12.5px;margin:0}
+.kv dt{color:var(--dim)} .kv dd{margin:0}
+.quote{border-left:2px solid var(--line);padding:2px 0 2px 10px;color:var(--muted);font-size:12.5px;font-style:italic}
+.coach{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 16px;font-size:13px}
+.coach .lbl{font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--dim);margin-bottom:2px}
+.coach .better{grid-column:1/-1;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.coach .better p{margin:0}
+.prep label{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-top:1px solid var(--line-soft);cursor:pointer}
+.prep label:first-child{border-top:0}
+.prep input{margin-top:3px}
+.prep input:checked + span{color:var(--dim);text-decoration:line-through}
+pre.transcript{white-space:pre-wrap;word-break:break-word;font-family:var(--font-body);font-size:13px;line-height:1.55;max-height:70vh;overflow:auto;margin:0;background:var(--bg);border:1px solid var(--line-soft);border-radius:8px;padding:14px}
+/* Import */
+.field{display:flex;flex-direction:column;gap:4px}
+.field label,.field .lab{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--dim)}
+.field textarea{min-height:72px;resize:vertical}
+.field .inp,.field .sel{width:100%}
+.form3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:18px;text-align:center;color:var(--muted);display:flex;flex-direction:column;gap:8px;align-items:center}
+.drop.over{border-color:var(--accent);background:var(--surface-2)}
+.progress{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.progress .bar{height:4px;border-radius:2px;background:var(--line-soft);overflow:hidden}
+.progress .bar i{display:block;height:100%;width:30%;background:var(--accent);animation:slide 1.4s ease-in-out infinite}
+@keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(340%)}}
+/* Drawer */
+.scrim{position:fixed;inset:0;background:rgba(1,4,23,.6);z-index:20}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(520px,100%);background:var(--surface);border-left:1px solid var(--line);z-index:21;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.drawer header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line-soft)}
+.drawer header b{font-family:var(--font-display);font-weight:400;font-size:17px}
+.drawer .dbody{overflow-y:auto;padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.drawer footer{padding:12px 18px;border-top:1px solid var(--line-soft);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.notes{display:flex;flex-direction:column;gap:6px}
+.note{background:var(--bg);border-radius:8px;padding:8px 10px;font-size:12.5px}
+.note .d{font-family:var(--font-mono);font-size:11px;color:var(--dim)}
+.confirm{border:1px solid var(--crit);border-radius:8px;padding:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}
+.confirm.warn{border-color:var(--med)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--surface-2);border:1px solid var(--line);padding:8px 14px;border-radius:8px;font-size:13px;z-index:30}
+.banner{border:1px solid var(--med);color:var(--med);border-radius:var(--r);padding:10px 14px;font-size:13px}
+@media (max-width:1000px){.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.grid2{grid-template-columns:minmax(0,1fr)}.form3{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.coach{grid-template-columns:minmax(0,1fr)}.kv{grid-template-columns:minmax(0,1fr)}.dates{display:none}.top .wrap{gap:10px}.status-dot{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<header class="top"><div class="wrap">
+  <div class="brand"><b>Meeting Intelligence</b><span>Sportsbook UX</span></div>
+  <nav class="nav" id="nav" aria-label="Sections"></nav>
+  <div class="status-dot" id="dbstate"></div>
+</div></header>
+<main class="main wrap" id="main" aria-live="polite"><div class="pending">Loading meeting data…</div></main>
+<div id="overlay"></div>
+
+<script>
+(function(){
+"use strict";
+/* ---------- constants ---------- */
+const COLS=["meetings","actions","decisions","concerns","issues","objectives","reviews","milestones"];
+const PRI=["Critical","High","Medium","Low"];
+const CERT=["Confirmed","Proposed","Inferred","Needs validation"];
+const STATUS=["To Do","In Progress","In Review","Blocked","Completed"];
+const CATS=["Usability","Navigation","Betting Experience","Market Discovery","Design System","Visual Identity","Product Performance","Technical Constraints"];
+const TYPES=["Sportsbook PM","UX Team"];
+const PEOPLE=["Luis","Rodrigo","Raluca","Darren"];
+const PROJECTS=["Sportsbook Redesign","Brand V5 Migration","Market UX","UX Intelligence Dashboard","DesignOps","Strategy"];
+const SCHEMA={
+  meetings:{prefix:"MTG",label:"Meeting",title:r=>r.title,fields:[
+    ["date","Meeting date","date"],["type","Meeting type","select",TYPES],["title","Title","text"],
+    ["participants","Participants (comma-separated)","list"],["analysisStatus","Analysis","select",["Analyzed","Pending analysis"]],
+    ["timestamps","Timestamps in transcript","select",["None","Available"]],
+    ["topics","Key topics (one per line)","lines"],["takeaways","Top takeaways (one per line)","lines"],
+    ["risks","Critical issues: Priority | issue | why (one per line)","risks"],
+    ["unresolved","Unresolved questions (one per line)","lines"],["prep","Next meeting prep (one per line)","lines"],
+    ["notes","Notes","textarea"]]},
+  actions:{prefix:"ACT",label:"Action",title:r=>r.title,fields:[
+    ["title","Action","textarea"],["owner","Owner","text",PEOPLE],["project","Project","text",PROJECTS],
+    ["priority","Priority","select",PRI],["status","Status","select",STATUS],
+    ["kind","Type","select",["Commitment","Suggestion","Conditional"]],["approval","Pending approval","select",["No","Yes"]],
+    ["deadline","Deadline","date"],["deadlineNote","Deadline note (when the date is TBD or approximate)","text"],
+    ["nextStep","Next step","text"],["meetingId","Source meeting","meeting"],["certainty","Certainty","select",CERT],
+    ["evidence","Evidence (speaker: quote or faithful summary)","textarea"]]},
+  decisions:{prefix:"DEC",label:"Decision",title:r=>r.decision,fields:[
+    ["decision","Decision","textarea"],["state","State","select",["Confirmed","Pending","Proposal","Rejected"]],
+    ["by","Made or confirmed by","text"],["meetingId","Meeting","meeting"],["feature","Feature / project","text",PROJECTS],
+    ["rationale","Rationale","textarea"],["dependencies","Dependencies","text"],
+    ["implStatus","Implementation","select",["Not started","In progress","Done","Blocked","N/A"]],["evidence","Evidence","textarea"]]},
+  concerns:{prefix:"CON",label:"Concern",title:r=>r.concern,fields:[
+    ["stakeholder","Stakeholder","select",["Rodrigo","Raluca","Darren"]],["concern","Concern","textarea"],["area","Area","text"],
+    ["impact","Impact","textarea"],["response","Proposed response","textarea"],
+    ["status","Status","select",["Open","Addressing","Resolved"]],["certainty","Certainty","select",CERT],
+    ["meetingId","Meeting","meeting"],["evidence","Evidence","textarea"]]},
+  issues:{prefix:"ISS",label:"UX issue",title:r=>r.title,fields:[
+    ["title","Issue","textarea"],["category","Category","select",CATS],["feature","Affected feature","text"],
+    ["userImpact","User impact","textarea"],["businessImpact","Business impact","textarea"],
+    ["approach","Recommended UX approach","textarea"],["priority","Priority","select",PRI],
+    ["status","Status","select",["Open","Validating","Planned","Resolved"]],["certainty","Certainty","select",CERT],
+    ["meetingId","Meeting","meeting"],["evidence","Evidence","textarea"]]},
+  objectives:{prefix:"OBJ",label:"Objective",title:r=>r.title,fields:[
+    ["title","Objective","text"],["source","Source","select",["Stated company goal","Proposed UX objective"]],
+    ["initiatives","Related initiatives (one per line)","lines"],["progress","Progress","select",["Not started","In progress","At risk","Done"]],
+    ["blockers","Blockers (one per line)","lines"],["stakeholders","Stakeholders (comma-separated)","list"],
+    ["nextMilestone","Next milestone","text"],["sequence","Sequencing constraint","text"],["meetingId","First discussed in","meeting"],["evidence","Evidence","textarea"]]},
+  reviews:{prefix:"REV",label:"Coaching note",title:r=>r.moment,fields:[
+    ["meetingId","Meeting","meeting"],["moment","Moment","text"],["dimensions","Dimensions (comma-separated)","list"],
+    ["said","What I said","textarea"],["worked","What worked","textarea"],["improve","What could improve","textarea"],
+    ["better","Better alternative","textarea"],["benefit","Expected benefit","textarea"]]},
+  milestones:{prefix:"MS",label:"Milestone",title:r=>r.title,fields:[
+    ["date","Date","date"],["endDate","End date (optional)","date"],["title","Title","text"],
+    ["kind","Type","select",["Deadline","Milestone","Out of office","Reminder"]],["project","Project","text",PROJECTS],
+    ["priority","Priority","select",PRI],["certainty","Certainty","select",CERT],["source","Source","text"],["meetingId","Meeting","meeting"]]}
+};
+const MTABS=[["summary","Summary"],["critical","Critical issues"],["actions","Actions"],["decisions","Decisions"],["concerns","PM concerns"],["issues","UX issues"],["objectives","Objectives"],["coaching","Coaching"],["prep","Next meeting prep"],["transcript","Transcript"]];
+
+/* ---------- state ---------- */
+const S={}; COLS.forEach(c=>S[c]=[]);
+const loaded=new Set();
+let db=null, sample=null, dbState="connecting";
+const transcripts={};
+const ui={view:"meetings",meetingId:null,tab:"summary",typeF:"All",drawer:null,toast:null,
+  imp:{type:"Sportsbook PM",date:null,title:"",participants:"",text:"",fileName:"",busy:false,msg:"",createdId:null,dupOk:false},
+  analysis:{} /* meetingId -> {state, msg, text} */};
+
+/* ---------- utils ---------- */
+const esc=s=>String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad=n=>String(n).padStart(2,"0");
+const isoOf=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const parse=s=>{const[y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)};
+const addDays=(s,n)=>{const d=parse(s);d.setDate(d.getDate()+n);return isoOf(d)};
+const TODAY=isoOf(new Date());
+const validIso=s=>typeof s==="string"&&/^\d{4}-\d{2}-\d{2}$/.test(s);
+const fmt=(s,o)=>validIso(s)?parse(s).toLocaleDateString("en-GB",o||{day:"numeric",month:"short",year:"numeric"}):"TBD";
+const fmtLong=s=>validIso(s)?parse(s).toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long",year:"numeric"}):"TBD";
+const arr=v=>Array.isArray(v)?v:[];
+const byId=(c,id)=>S[c].find(r=>r.id===id);
+const meetingOf=id=>byId("meetings",id);
+const mType=m=>m&&m.type==="UX Team"?"UX Team":"Sportsbook PM";
+const typeCls=t=>t==="UX Team"?"ux":"pm";
+const chipType=t=>`<span class="chip type ${typeCls(t)}">${esc(t)}</span>`;
+const isOpenAction=a=>a.status!=="Completed";
+const isOverdue=a=>isOpenAction(a)&&validIso(a.deadline)&&a.deadline<TODAY;
+const priRank=p=>{const i=PRI.indexOf(p);return i<0?9:i};
+const certCls=c=>c==="Needs validation"?"Needs":(c||"");
+const chipPri=p=>p?`<span class="chip pri ${esc(p)}">${esc(p)}</span>`:"";
+const chipCert=c=>c?`<span class="chip cert ${certCls(c)}">${esc(c)}</span>`:"";
+const chipStatus=s=>s?`<span class="chip status ${esc(String(s).split(" ")[0])}">${esc(s)}</span>`:"";
+const linked=(r,id)=>r.meetingId===id||arr(r.meetingIds).includes(id);
+const sortedMeetings=()=>[...S.meetings].filter(m=>validIso(m.date)).sort((a,b)=>a.date.localeCompare(b.date)||a.id.localeCompare(b.id));
+const mref=id=>{const m=meetingOf(id);return m?`<button class="linkish mono" data-open-meeting="${esc(m.id)}">${esc(fmt(m.date,{day:"numeric",month:"short"}))} · ${esc(mType(m))}</button>`:(id?`<span class="mono dim">${esc(id)}</span>`:"")};
+const I={l:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 3 5 8l5 5"/></svg>',r:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m6 3 5 5-5 5"/></svg>',x:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m4 4 8 8M12 4l-8 8"/></svg>',plus:'<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 3v10M3 8h10"/></svg>'};
+function toast(msg){ui.toast=msg;renderOverlay();clearTimeout(toast.t);toast.t=setTimeout(()=>{ui.toast=null;renderOverlay()},2800)}
+function nextId(col,extra){const p=SCHEMA[col].prefix;let n=0;S[col].concat(extra||[]).forEach(r=>{const m=String(r.id||"").match(/(\d+)$/);if(m)n=Math.max(n,+m[1])});return p+"-"+String(n+1).padStart(3,"0")}
+
+/* ---------- data ---------- */
+async function boot(){
+  try{ if(!window.claude||!window.claude.use) throw 0; db=await window.claude.use("db"); }catch(e){db=null}
+  if(!db){dbState="off";render();return}
+  dbState="on";
+  COLS.forEach(c=>{
+    db.collection(c).onSnapshot(snap=>{
+      S[c]=snap.docs.map(d=>Object.assign({},d.data(),{id:d.id}));
+      loaded.add(c);
+      if(c==="meetings"&&!ui.meetingId)pickLatest();
+      render();
+    },()=>{dbState="error";render()});
+  });
+  try{sample=await window.claude.use("sample")}catch(e){sample=null}
+  render();
+}
+function pickLatest(){const ms=sortedMeetings().filter(m=>m.date<=TODAY);const m=ms[ms.length-1]||sortedMeetings().slice(-1)[0];if(m)ui.meetingId=m.id}
+function clean(rec){const b=JSON.parse(JSON.stringify(rec));delete b.id;return b}
+async function save(col,rec,change,meetingId){
+  if(!db){toast("Data store unavailable. Changes were not saved.");return false}
+  const body=clean(rec);
+  body.history=arr(body.history).concat(change?[{date:TODAY,change,meetingId:meetingId||null}]:[]);
+  body.updatedAt=new Date().toISOString();
+  try{await db.collection(col).doc(rec.id).set(body);return true}
+  catch(e){toast("Could not save: "+(e&&e.message?e.message:"unknown error"));return false}
+}
+async function loadTranscript(id){
+  if(transcripts[id]!==undefined||!db)return;
+  transcripts[id]=null;
+  try{const s=await db.collection("transcripts").doc(id).get();transcripts[id]=s.exists?String(s.data().text||""):""}catch(e){transcripts[id]=""}
+  render();
+}
+
+/* ---------- routing ---------- */
+function readHash(){
+  const h=(location.hash||"").slice(1);
+  if(h.startsWith("meeting-")){ui.view="meetings";ui.meetingId=h.slice(8).toUpperCase();return}
+  if(h==="overview"||h==="import"||h==="meetings"){ui.view=h;return}
+}
+function go(h){if(location.hash==="#"+h){readHash();render()}else location.hash=h}
+window.addEventListener("hashchange",()=>{readHash();render();window.scrollTo(0,0)});
+
+/* ---------- render shell ---------- */
+function render(){renderNav();renderMain();renderOverlay()}
+function renderNav(){
+  const items=[["meetings","Meetings"],["overview","Overview"],["import","Import transcript"]];
+  document.getElementById("nav").innerHTML=items.map(([k,l])=>`<button data-go="${k}" ${ui.view===k?'aria-current="page"':""}>${l}</button>`).join("");
+  document.getElementById("dbstate").innerHTML=dbState==="on"?'<i></i>Saved to this artifact':`<i class="off"></i>${dbState==="connecting"?"Connecting…":"Storage unavailable"}`;
+}
+function head(title,sub,actions){return `<div class="head"><div><h1>${title}</h1>${sub?`<div class="sub">${sub}</div>`:""}</div>${actions?`<div class="row">${actions}</div>`:""}</div>`}
+function storageBanner(){
+  if(dbState==="off")return `<div class="banner">The data store is not available in this view. Open the artifact in claude.ai while signed in to load and save meetings.</div>`;
+  if(dbState==="error")return `<div class="banner">The connection to the data store dropped. Reload the page to reconnect.</div>`;
+  return "";
+}
+function renderMain(){
+  const el=document.getElementById("main");
+  let html=storageBanner();
+  if(dbState==="on"&&loaded.size<COLS.length){el.innerHTML=html+`<div class="pending">Loading meeting data…</div>`;return}
+  if(ui.view==="import")html+=vImport();
+  else if(dbState==="on"&&S.meetings.length===0)html+=head("No meetings yet","Import your first transcript to create a meeting.",`<button class="btn primary" data-go="import">Import transcript</button>`);
+  else if(ui.view==="overview")html+=vOverview();
+  else html+=vMeetings();
+  el.innerHTML=html;
+}
+
+/* ---------- meetings ---------- */
+function vMeetings(){
+  let all=sortedMeetings();
+  const list=ui.typeF==="All"?all:all.filter(m=>mType(m)===ui.typeF);
+  let m=meetingOf(ui.meetingId);
+  if(!m||(ui.typeF!=="All"&&mType(m)!==ui.typeF)){m=list[list.length-1];if(m)ui.meetingId=m.id}
+  const i=list.findIndex(x=>m&&x.id===m.id);const prev=list[i-1],next=list[i+1];
+  const opts=[...list].reverse().map(x=>`<option value="${esc(x.id)}" ${m&&x.id===m.id?"selected":""}>${esc(fmt(x.date,{weekday:"short",day:"numeric",month:"short",year:"numeric"}))} · ${esc(x.title)}</option>`).join("");
+  const switcher=`<div class="switcher"><div class="row1">
+    <div class="seg" role="group" aria-label="Meeting type">${["All"].concat(TYPES).map(t=>`<button data-typef="${t}" aria-pressed="${ui.typeF===t}">${t}</button>`).join("")}</div>
+    <button class="btn icon" data-open-meeting="${prev?esc(prev.id):""}" ${prev?"":"disabled"} aria-label="Previous meeting">${I.l}</button>
+    <select class="sel" id="msel" aria-label="Meeting date">${opts||"<option>No meetings</option>"}</select>
+    <button class="btn icon" data-open-meeting="${next?esc(next.id):""}" ${next?"":"disabled"} aria-label="Next meeting">${I.r}</button>
+  </div>
+  <div class="dates" role="group" aria-label="Meetings by date">${list.map(x=>`<button class="dt" data-open-meeting="${esc(x.id)}" aria-pressed="${m&&x.id===m.id}"><span class="d">${esc(fmt(x.date,{day:"numeric",month:"short"}))}</span><span class="w"><i class="${typeCls(mType(x))} ${x.analysisStatus==="Analyzed"?"":"pend"}"></i>${esc(mType(x)==="UX Team"?"UX Team":"PM")}</span></button>`).join("")}</div></div>`;
+  if(!m)return switcher+`<div class="panel"><div class="empty">No ${esc(ui.typeF)} meetings yet.</div></div>`;
+  return switcher+meetingDetail(m);
+}
+function relFor(m){const r={};["actions","decisions","concerns","issues","objectives","reviews","milestones"].forEach(c=>r[c]=S[c].filter(x=>linked(x,m.id)));return r}
+function carried(m){
+  const ids=new Set(sortedMeetings().filter(x=>x.date<m.date&&x.id!==m.id).map(x=>x.id));
+  return S.actions.filter(a=>isOpenAction(a)&&ids.has(a.meetingId)&&!arr(a.meetingIds).includes(m.id));
+}
+function meetingDetail(m){
+  const rel=relFor(m);
+  const counts={critical:arr(m.risks).length,actions:rel.actions.length,decisions:rel.decisions.length,concerns:rel.concerns.length,issues:rel.issues.length,objectives:rel.objectives.length,coaching:rel.reviews.length,prep:arr(m.prep).length};
+  if(!MTABS.some(t=>t[0]===ui.tab))ui.tab="summary";
+  const analyzed=m.analysisStatus==="Analyzed";
+  let body="";
+  const t=ui.tab;
+  if(t==="summary")body=analyzed?summaryTab(m,rel):pendingBlock(m);
+  else if(t==="critical")body=`<div class="panel">${arr(m.risks).length?`<div class="list">${arr(m.risks).map(riskItem).join("")}</div>`:'<div class="empty">None recorded.</div>'}</div>`;
+  else if(t==="actions")body=addBar("actions","Add action")+actionTable(rel.actions,m)+carriedBlock(m);
+  else if(t==="decisions")body=addBar("decisions","Add decision")+decisionGroups(rel.decisions,m);
+  else if(t==="concerns")body=addBar("concerns","Add concern")+concernCards(rel.concerns,m);
+  else if(t==="issues")body=addBar("issues","Add UX issue")+issueGroups(rel.issues,m);
+  else if(t==="objectives")body=addBar("objectives","Add objective")+objectiveCards(rel.objectives,m);
+  else if(t==="coaching")body=addBar("reviews","Add coaching note")+reviewCards(rel.reviews);
+  else if(t==="prep")body=`<div class="grid2"><div class="panel"><h2>Checklist</h2>${arr(m.prep).length?prepList(m):'<div class="empty">No preparation items.</div>'}</div><div class="panel"><h2>Unresolved questions</h2>${arr(m.unresolved).length?`<ul class="take">${arr(m.unresolved).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:'<div class="empty">None recorded.</div>'}</div></div>`;
+  else if(t==="transcript"){loadTranscript(m.id);const tx=transcripts[m.id];body=tx==null?'<div class="pending">Loading transcript…</div>':tx?`<pre class="transcript">${esc(tx)}</pre>`:'<div class="panel"><div class="empty">No transcript stored for this meeting. Use Import transcript to add one.</div></div>'}
+  return `<div class="mhead">${head(esc(m.title),`${esc(fmtLong(m.date))}`,`${chipType(mType(m))}${analyzed?'<span class="chip cert Confirmed">Analyzed</span>':'<span class="chip cert Needs">Pending analysis</span>'}<button class="btn" data-edit="meetings:${esc(m.id)}">Edit meeting</button>`)}
+  <div class="factrow"><span>Participants <b>${esc(arr(m.participants).join(", ")||"TBD")}</b></span><span>Timestamps <b>${esc(m.timestamps||"None")}</b></span><span class="mono">${esc(m.id)}</span></div></div>
+  <div class="tabs" role="tablist">${MTABS.map(([k,l])=>`<button role="tab" data-tab="${k}" aria-selected="${t===k}">${l}${counts[k]!=null?`<span class="count">${counts[k]}</span>`:""}</button>`).join("")}</div>${body}`;
+}
+function addBar(col,label){return `<div class="row" style="justify-content:flex-end"><button class="btn" data-new="${col}">${I.plus}${label}</button></div>`}
+function summaryTab(m,rel){
+  const crit=arr(m.risks).filter(r=>r.priority==="Critical");
+  const conf=rel.decisions.filter(d=>d.state==="Confirmed");
+  const mine=rel.actions.filter(a=>a.owner==="Luis"&&isOpenAction(a));
+  return `<div class="grid2"><div class="stack">
+    <div class="panel"><h2>Top takeaways</h2><ol class="take">${arr(m.takeaways).map(x=>`<li>${esc(x)}</li>`).join("")}</ol></div>
+    ${crit.length?`<div class="panel"><h2 style="color:var(--crit)">Critical</h2><div class="list">${crit.map(riskItem).join("")}</div></div>`:""}
+    <div class="panel"><h2>Decisions confirmed</h2>${conf.length?`<div class="list">${conf.map(d=>`<div class="item"><div class="body"><button class="linkish t" data-edit="decisions:${esc(d.id)}">${esc(d.decision)}</button><div class="meta"><span>${esc(d.by||"")}</span></div></div></div>`).join("")}</div>`:'<div class="empty">None confirmed in this meeting.</div>'}</div>
+  </div><div class="stack">
+    <div class="panel"><h2>My next steps</h2>${mine.length?`<div class="list">${mine.map(actItem).join("")}</div>`:'<div class="empty">No open actions for you from this meeting.</div>'}</div>
+    <div class="panel"><h2>Key topics</h2><div class="row">${arr(m.topics).map(x=>`<span class="chip">${esc(x)}</span>`).join("")||'<span class="empty">None</span>'}</div></div>
+    <div class="panel"><h2>In this meeting</h2><div class="stats"><span><b>${rel.actions.length}</b>actions</span><span><b>${rel.decisions.length}</b>decisions</span><span><b>${rel.concerns.length}</b>PM concerns</span><span><b>${rel.issues.length}</b>UX issues</span><span><b>${arr(m.unresolved).length}</b>open questions</span></div></div>
+    ${m.notes?`<div class="panel"><h2>Notes</h2><div class="muted">${esc(m.notes)}</div></div>`:""}
+  </div></div>`;
+}
+function pendingBlock(m){
+  const st=ui.analysis[m.id]||{};
+  if(transcripts[m.id]===undefined)loadTranscript(m.id);
+  const has=!!transcripts[m.id];
+  if(st.state==="running")return progressBlock(st);
+  return `<div class="pending"><div>${has?"The transcript is stored but not analysed yet.":"No transcript stored for this meeting yet."}</div>
+  ${st.msg?`<div class="banner">${esc(st.msg)}</div>`:""}
+  <div class="row">${has?(sample?`<button class="btn primary" data-analyze="${esc(m.id)}">Analyze with Claude</button>`:'<span class="dim">In-page analysis is not available in this view. Share the transcript in the chat instead.</span>'):`<button class="btn primary" data-go="import">Import transcript</button>`}</div>
+  ${has&&sample?'<div class="dim" style="font-size:12px">Runs on your Claude account. Takes one to three minutes. Existing records are updated instead of duplicated.</div>':""}</div>`;
+}
+function progressBlock(st){return `<div class="panel progress"><div>${esc(st.msg||"Analysing transcript…")}</div><div class="bar"><i></i></div>${st.chars?`<div class="dim mono" style="font-size:12px">${st.chars.toLocaleString("en-GB")} characters received</div>`:""}<div><button class="btn ghost" data-stop>Stop</button></div></div>`}
+function riskItem(r){return `<div class="item"><div class="body"><div class="t">${esc(r.text)}</div><div class="meta">${chipPri(r.priority)}<span>${esc(r.why||"")}</span></div></div></div>`}
+function actItem(a){return `<div class="item"><input type="checkbox" class="check" data-done="${esc(a.id)}" ${a.status==="Completed"?"checked":""} aria-label="Mark ${esc(a.id)} completed"><div class="body"><button class="linkish t" data-edit="actions:${esc(a.id)}">${esc(a.title)}</button><div class="meta">${chipPri(a.priority)}<span>${esc(a.owner||"Unassigned")}</span>${chipStatus(a.status)}${isOverdue(a)?'<span class="chip overdue">Overdue</span>':""}<span class="mono">${validIso(a.deadline)?"Due "+esc(fmt(a.deadline,{day:"numeric",month:"short"})):"Due TBD"}</span>${a.deadlineNote?`<span>${esc(a.deadlineNote)}</span>`:""}</div></div></div>`}
+function prepList(m){const done=arr(m.prepDone);return `<div class="prep">${arr(m.prep).map((p,i)=>`<label><input type="checkbox" data-prep="${esc(m.id)}:${i}" ${done.includes(i)?"checked":""}><span>${esc(p)}</span></label>`).join("")}</div>`}
+const evidenceBlock=e=>e?`<div class="quote">${esc(e)}</div>`:"";
+const againTag=(r,m)=>r.meetingId!==m.id?`<span class="chip">From ${esc(fmt((meetingOf(r.meetingId)||{}).date,{day:"numeric",month:"short"}))}</span>`:"";
+function deadlineCell(a){return `${validIso(a.deadline)?`<span class="mono">${esc(fmt(a.deadline,{day:"numeric",month:"short"}))}</span>${isOverdue(a)?' <span class="chip overdue">Overdue</span>':""}`:'<span class="mono dim">TBD</span>'}${a.deadlineNote?`<div class="dim" style="font-size:11.5px">${esc(a.deadlineNote)}</div>`:""}`}
+function actionTable(list,m){
+  if(!list.length)return `<div class="panel"><div class="empty">No actions from this meeting.</div></div>`;
+  list=[...list].sort((a,b)=>(a.status==="Completed")-(b.status==="Completed")||priRank(a.priority)-priRank(b.priority)||String(a.deadline||"9").localeCompare(String(b.deadline||"9")));
+  return `<div class="tablewrap"><table><thead><tr><th></th><th>Priority</th><th>Action</th><th>Owner</th><th>Deadline</th><th>Status</th><th>Next step</th></tr></thead><tbody>${list.map(a=>`<tr class="${isOverdue(a)?"isover":""} ${a.status==="Completed"?"isdone":""}"><td><input type="checkbox" class="check" data-done="${esc(a.id)}" ${a.status==="Completed"?"checked":""} aria-label="Mark ${esc(a.id)} completed"></td><td>${chipPri(a.priority)}</td><td style="min-width:260px"><button class="linkish" style="font-weight:500" data-edit="actions:${esc(a.id)}">${esc(a.title)}</button><div class="row" style="margin-top:4px"><span class="mono dim" style="font-size:11px">${esc(a.id)}</span><span class="chip kind">${esc(a.kind||"")}</span>${a.approval==="Yes"?'<span class="chip">Approval</span>':""}${m?againTag(a,m):""}${arr(a.notes).length?`<span class="chip">${arr(a.notes).length} note${arr(a.notes).length>1?"s":""}</span>`:""}</div></td><td>${esc(a.owner||"")}</td><td style="white-space:nowrap">${deadlineCell(a)}</td><td><select class="sel" data-status="${esc(a.id)}" aria-label="Status of ${esc(a.id)}">${STATUS.map(s=>`<option ${a.status===s?"selected":""}>${s}</option>`).join("")}</select></td><td class="muted" style="min-width:180px">${esc(a.nextStep||"")}</td></tr>`).join("")}</tbody></table></div>`;
+}
+function carriedBlock(m){const c=carried(m);if(!c.length)return "";return `<div class="sectionlbl">Still open from earlier meetings<span class="mono dim">${c.length}</span></div>`+actionTable(c,m)}
+function decisionGroups(list,m){
+  if(!list.length)return `<div class="panel"><div class="empty">No decisions from this meeting.</div></div>`;
+  return ["Confirmed","Pending","Proposal","Rejected"].map(st=>{const l=list.filter(d=>d.state===st);return l.length?`<div class="sectionlbl">${st==="Proposal"?"Proposals":st==="Rejected"?"Rejected alternatives":st}<span class="mono dim">${l.length}</span></div><div class="cards">${l.map(d=>decisionCard(d,m)).join("")}</div>`:""}).join("");
+}
+function decisionCard(d,m){
+  const st={Confirmed:"Confirmed",Pending:"Needs validation",Proposal:"Proposed",Rejected:"Inferred"}[d.state];
+  return `<div class="card"><div class="row" style="justify-content:space-between"><span class="mono dim">${esc(d.id)}</span><div class="row">${againTag(d,m)}<span class="chip cert ${certCls(st)}">${esc(d.state)}</span></div></div><button class="linkish t" data-edit="decisions:${esc(d.id)}">${esc(d.decision)}</button><dl class="kv"><dt>By</dt><dd>${esc(d.by||"Unknown")}</dd><dt>Feature</dt><dd>${esc(d.feature||"")}</dd><dt>Rationale</dt><dd>${esc(d.rationale||"Unknown")}</dd><dt>Depends on</dt><dd>${esc(d.dependencies||"None stated")}</dd><dt>Status</dt><dd>${esc(d.implStatus||"")}</dd></dl>${evidenceBlock(d.evidence)}${historyDetails(d)}</div>`;
+}
+function historyDetails(r){return arr(r.history).length>1?`<details><summary class="dim" style="cursor:pointer;font-size:12px">History (${arr(r.history).length})</summary><div class="notes" style="margin-top:6px">${arr(r.history).map(h=>`<div class="note"><span class="d">${esc(h.date)}</span> ${esc(h.change)}</div>`).join("")}</div></details>`:""}
+function concernCards(list,m){
+  if(!list.length)return `<div class="panel"><div class="empty">No concerns from Rodrigo, Raluca or Darren in this meeting.</div></div>`;
+  return ["Rodrigo","Raluca","Darren"].map(p=>{const l=list.filter(c=>c.stakeholder===p);return l.length?`<div class="sectionlbl">${p}<span class="mono dim">${l.length}</span></div><div class="cards">${l.map(c=>`<div class="card"><div class="row" style="justify-content:space-between"><span class="dim">${esc(c.area||"")}</span><div class="row">${againTag(c,m)}${chipStatus(c.status)}${chipCert(c.certainty)}</div></div><button class="linkish t" data-edit="concerns:${esc(c.id)}">${esc(c.concern)}</button><dl class="kv"><dt>Impact</dt><dd>${esc(c.impact||"Unknown")}</dd><dt>Response</dt><dd>${esc(c.response||"TBD")}</dd></dl>${evidenceBlock(c.evidence)}${historyDetails(c)}</div>`).join("")}</div>`:""}).join("");
+}
+function issueGroups(list,m){
+  if(!list.length)return `<div class="panel"><div class="empty">No UX issues from this meeting.</div></div>`;
+  return CATS.map(c=>{const l=list.filter(i=>i.category===c);return l.length?`<div class="sectionlbl">${esc(c)}<span class="mono dim">${l.length}</span></div><div class="cards">${l.map(i=>`<div class="card"><div class="row" style="justify-content:space-between"><span class="mono dim">${esc(i.id)}</span><div class="row">${againTag(i,m)}${chipPri(i.priority)}${chipCert(i.certainty)}</div></div><button class="linkish t" data-edit="issues:${esc(i.id)}">${esc(i.title)}</button><dl class="kv"><dt>Feature</dt><dd>${esc(i.feature||"Unknown")}</dd><dt>User impact</dt><dd>${esc(i.userImpact||"Unknown")}</dd><dt>Business</dt><dd>${esc(i.businessImpact||"Unknown")}</dd><dt>Approach</dt><dd>${esc(i.approach||"TBD")}</dd><dt>Status</dt><dd>${esc(i.status||"")}</dd></dl>${evidenceBlock(i.evidence)}</div>`).join("")}</div>`:""}).join("");
+}
+function objectiveCards(list,m){
+  if(!list.length)return `<div class="panel"><div class="empty">No objectives discussed in this meeting.</div></div>`;
+  return `<div class="cards">${list.map(o=>`<div class="card"><div class="row" style="justify-content:space-between"><span class="chip ${o.source==="Stated company goal"?"cert Confirmed":"cert Proposed"}">${esc(o.source||"")}</span><div class="row">${againTag(o,m)}${chipStatus(o.progress)}</div></div><button class="linkish t" data-edit="objectives:${esc(o.id)}">${esc(o.title)}</button><dl class="kv"><dt>Initiatives</dt><dd>${esc(arr(o.initiatives).join("; ")||"None")}</dd><dt>Blockers</dt><dd>${esc(arr(o.blockers).join("; ")||"None stated")}</dd><dt>Stakeholders</dt><dd>${esc(arr(o.stakeholders).join(", "))}</dd><dt>Next milestone</dt><dd>${esc(o.nextMilestone||"TBD")}</dd>${o.sequence?`<dt>Sequence</dt><dd>${esc(o.sequence)}</dd>`:""}</dl>${evidenceBlock(o.evidence)}</div>`).join("")}</div>`;
+}
+function reviewCards(list){
+  if(!list.length)return `<div class="panel"><div class="empty">No communication review for this meeting.</div></div>`;
+  return `<div class="stack">${list.map(r=>`<div class="panel stack"><div class="row" style="justify-content:space-between"><button class="linkish t" style="font-weight:600" data-edit="reviews:${esc(r.id)}">${esc(r.moment)}</button><div class="row">${arr(r.dimensions).map(x=>`<span class="chip">${esc(x)}</span>`).join("")}</div></div>
+  <div class="coach"><div><div class="lbl">What I said</div>${esc(r.said)}</div><div><div class="lbl">What worked</div>${esc(r.worked)}</div><div><div class="lbl">What could improve</div>${esc(r.improve)}</div><div><div class="lbl">Expected benefit</div>${esc(r.benefit)}</div><div class="better"><div class="lbl">Better alternative</div><p>${esc(r.better)}</p></div></div></div>`).join("")}</div>`;
+}
+
+/* ---------- overview ---------- */
+function kpis(){
+  return {open:S.actions.filter(isOpenAction).length,
+    crit:S.actions.filter(a=>isOpenAction(a)&&a.priority==="Critical").length+S.issues.filter(i=>i.status!=="Resolved"&&i.priority==="Critical").length,
+    dec:S.decisions.filter(d=>d.state==="Confirmed").length,
+    appr:S.actions.filter(a=>isOpenAction(a)&&a.approval==="Yes").length+S.decisions.filter(d=>d.state==="Pending").length,
+    con:S.concerns.filter(c=>c.status!=="Resolved").length,
+    fol:S.actions.filter(a=>isOpenAction(a)&&a.owner&&a.owner!=="Luis").length};
+}
+function vOverview(){
+  const k=kpis();
+  const t=(n,l,alert,hint)=>`<div class="kpi ${alert&&n?"alert":""}" title="${esc(hint)}"><b>${n}</b><span>${l}</span></div>`;
+  const soon=addDays(TODAY,7);
+  const att=S.actions.filter(a=>isOpenAction(a)&&(a.owner==="Luis"||!a.owner)&&(isOverdue(a)||(validIso(a.deadline)&&a.deadline<=soon)||a.priority==="Critical")).sort((a,b)=>priRank(a.priority)-priRank(b.priority)||String(a.deadline||"9").localeCompare(String(b.deadline||"9")));
+  const fol=S.actions.filter(a=>isOpenAction(a)&&a.owner&&a.owner!=="Luis").sort((a,b)=>priRank(a.priority)-priRank(b.priority));
+  const ms=S.milestones.filter(x=>validIso(x.date)&&(x.endDate||x.date)>=TODAY).sort((a,b)=>a.date.localeCompare(b.date));
+  const latest=TYPES.map(ty=>sortedMeetings().filter(m=>mType(m)===ty&&m.analysisStatus==="Analyzed").slice(-1)[0]).filter(Boolean);
+  return head("Overview","Across all meetings. Open a meeting for its full analysis.")+
+  `<div class="kpis">${t(k.open,"Open actions",0,"Actions not completed")}${t(k.crit,"Critical issues",1,"Open Critical actions plus open Critical UX issues")}${t(k.dec,"Decisions made",0,"Confirmed decisions")}${t(k.appr,"Pending approvals",0,"Open actions flagged for approval plus pending decisions")}${t(k.con,"PM concerns",0,"Concerns not resolved")}${t(k.fol,"Follow-ups",0,"Open actions owned by someone other than Luis")}</div>
+  <div class="grid2"><div class="stack">
+    <div class="panel"><h2>Needs my attention</h2>${att.length?`<div class="list">${att.map(a=>actItem(a)+"").join("")}</div>`:'<div class="empty">Nothing urgent for you.</div>'}</div>
+    <div class="panel"><h2>Waiting on others</h2>${fol.length?`<div class="list">${fol.map(actItem).join("")}</div>`:'<div class="empty">Nothing pending from others.</div>'}</div>
+  </div><div class="stack">
+    <div class="panel"><h2>Deadlines and milestones</h2>${ms.length?`<div class="list">${ms.map(x=>`<div class="item"><div class="body"><button class="linkish t" data-edit="milestones:${esc(x.id)}">${esc(x.title)}</button><div class="meta"><span class="mono">${esc(fmt(x.date,{day:"numeric",month:"short"}))}${validIso(x.endDate)?" – "+esc(fmt(x.endDate,{day:"numeric",month:"short"})):""}</span>${chipPri(x.priority)}<span>${esc(x.kind||"")}</span></div></div></div>`).join("")}</div>`:'<div class="empty">None recorded.</div>'}<div class="row" style="margin-top:8px"><button class="btn ghost" data-new="milestones">${I.plus}Add milestone</button></div></div>
+    ${latest.map(m=>`<div class="mcard"><div class="row" style="justify-content:space-between"><h3>Latest ${esc(mType(m))}</h3>${chipType(mType(m))}</div><div class="dim mono" style="font-size:12px">${esc(fmtLong(m.date))}</div><ol class="take">${arr(m.takeaways).slice(0,3).map(x=>`<li>${esc(x)}</li>`).join("")}</ol><div><button class="btn primary" data-open-meeting="${esc(m.id)}">Open meeting</button></div></div>`).join("")}
+  </div></div>`;
+}
+
+/* ---------- import ---------- */
+function vImport(){
+  const f=ui.imp;if(!f.date)f.date=TODAY;
+  const dup=S.meetings.find(m=>m.date===f.date&&mType(m)===f.type);
+  const created=f.createdId?meetingOf(f.createdId):null;
+  if(created){
+    const st=ui.analysis[created.id]||{};
+    return head("Transcript imported",`${esc(created.title)} · ${esc(fmtLong(created.date))}`)+
+    (st.state==="running"?progressBlock(st):`<div class="panel stack"><div>The meeting was created with its transcript. Analyse it now, or open it and analyse later.</div>${st.msg?`<div class="banner">${esc(st.msg)}</div>`:""}<div class="row">${sample?`<button class="btn primary" data-analyze="${esc(created.id)}">Analyze with Claude</button>`:'<span class="dim">In-page analysis is not available in this view. Share the transcript in the chat and Claude will add the analysis.</span>'}<button class="btn" data-open-meeting="${esc(created.id)}">Open meeting</button><button class="btn ghost" data-imp-reset>Import another</button></div>${sample?'<div class="dim" style="font-size:12px">Runs on your Claude account and takes one to three minutes. Items that match earlier records update those records instead of creating duplicates.</div>':""}</div>`);
+  }
+  return head("Import transcript","Upload a transcript file or paste the text. Each import creates one meeting.")+
+  `<div class="panel stack">
+    <div class="field"><span class="lab">Meeting type</span><div class="seg" role="group" aria-label="Meeting type">${TYPES.map(t=>`<button data-imptype="${t}" aria-pressed="${f.type===t}">${t==="UX Team"?"UX Team (general)":"Sportsbook PM"}</button>`).join("")}</div></div>
+    <div class="form3">
+      <div class="field"><label for="imp-date">Meeting date</label><input type="date" class="inp" id="imp-date" value="${esc(f.date)}"></div>
+      <div class="field"><label for="imp-title">Title</label><input class="inp" id="imp-title" value="${esc(f.title)}" placeholder="${esc(f.type==="UX Team"?"UX Team Meeting":"Sportsbook PM Review")}"></div>
+      <div class="field"><label for="imp-part">Participants (optional)</label><input class="inp" id="imp-part" value="${esc(f.participants)}" placeholder="Taken from the transcript if empty"></div>
+    </div>
+    <div class="drop" id="drop"><div>Drop a transcript file here, or</div><label class="btn" for="imp-file">Choose file</label><input type="file" id="imp-file" accept=".txt,.vtt,.srt,.md,.docx,text/plain" hidden><div class="dim" style="font-size:12px">.txt, .vtt, .srt, .md or .docx${f.fileName?` · Loaded: <span class="mono">${esc(f.fileName)}</span>`:""}</div></div>
+    <div class="field"><label for="imp-text">Or paste the transcript</label><textarea class="inp" id="imp-text" style="min-height:220px" placeholder="Speaker name&#10;What they said…">${esc(f.text)}</textarea><div class="dim mono" style="font-size:11.5px" id="imp-count">${f.text.length.toLocaleString("en-GB")} characters</div></div>
+    ${f.msg?`<div class="banner">${esc(f.msg)}</div>`:""}
+    ${dup&&!f.dupOk?`<div class="confirm warn"><span>A ${esc(f.type)} meeting already exists on ${esc(fmt(f.date))} (${esc(dup.title)}, ${esc(dup.analysisStatus||"")}).</span><button class="btn" data-open-meeting="${esc(dup.id)}">Open it</button><button class="btn ghost" data-dupok>Create a second one</button></div>`:""}
+    <div class="row"><button class="btn primary" data-create ${f.busy||(dup&&!f.dupOk)?"disabled":""}>Create meeting</button></div>
+  </div>`;
+}
+function readImportFields(){const f=ui.imp;const g=id=>document.getElementById(id);if(g("imp-date"))f.date=g("imp-date").value||f.date;if(g("imp-title"))f.title=g("imp-title").value;if(g("imp-part"))f.participants=g("imp-part").value;if(g("imp-text"))f.text=g("imp-text").value}
+let mammothP=null;
+function loadMammoth(){if(window.mammoth)return Promise.resolve(window.mammoth);if(mammothP)return mammothP;
+  mammothP=new Promise((res,rej)=>{const urls=["https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js","https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"];let i=0;
+    const next=()=>{if(i>=urls.length){mammothP=null;rej(new Error("load"));return}const s=document.createElement("script");s.src=urls[i++];s.onload=()=>window.mammoth?res(window.mammoth):next();s.onerror=next;document.head.appendChild(s)};next()});
+  return mammothP}
+async function readFile(file){
+  readImportFields();const f=ui.imp;f.msg="";
+  try{
+    if(/\.docx$/i.test(file.name)){const mm=await loadMammoth();const out=await mm.extractRawText({arrayBuffer:await file.arrayBuffer()});f.text=out.value||""}
+    else f.text=await file.text();
+    f.fileName=file.name;
+    if(!f.text.trim())f.msg="The file has no readable text.";
+  }catch(e){f.msg=/\.docx$/i.test(file.name)?"This .docx could not be read here. Open it and paste the text instead.":"The file could not be read. Paste the text instead."}
+  render();
+}
+async function createMeeting(){
+  readImportFields();const f=ui.imp;
+  if(!validIso(f.date)){f.msg="Choose the meeting date.";render();return}
+  if(f.text.trim().length<200){f.msg="Add the transcript (file or pasted text) before creating the meeting.";render();return}
+  if(f.text.length>240000){f.msg="The transcript is longer than 240,000 characters. Split it into parts and import each one.";render();return}
+  f.busy=true;render();
+  const id=nextId("meetings");
+  const ts=/\d{1,2}:\d{2}(:\d{2})?/.test(f.text.slice(0,4000))?"Available":"None";
+  const rec={id,date:f.date,type:f.type,title:f.title.trim()||(f.type==="UX Team"?"UX Team Meeting":"Sportsbook PM Review"),project:f.type==="UX Team"?"UX Team":"Sportsbook",
+    participants:f.participants.split(",").map(s=>s.trim()).filter(Boolean),analysisStatus:"Pending analysis",timestamps:ts,
+    topics:[],takeaways:[],risks:[],unresolved:[],prep:[],prepDone:[],notes:f.fileName?"Imported from "+f.fileName:"Imported from pasted text"};
+  try{
+    await db.collection("transcripts").doc(id).set({text:f.text,meetingId:id,importedAt:new Date().toISOString(),source:f.fileName||"paste"});
+    transcripts[id]=f.text;
+    const ok=await save("meetings",rec,"Created from imported transcript",id);
+    if(ok){f.createdId=id;f.busy=false;toast("Meeting created")}else{f.busy=false}
+  }catch(e){f.busy=false;f.msg="Could not save the transcript: "+(e&&e.message||"error")}
+  render();
+}
+
+/* ---------- analysis (Claude, in-page) ---------- */
+let ctl=null;
+function existingContext(m){
+  const line=(r,txt)=>`${r.id} | ${txt}`;
+  const parts=[];
+  const acts=S.actions.filter(isOpenAction);if(acts.length)parts.push("OPEN ACTIONS:\n"+acts.map(a=>line(a,`${a.title} | owner ${a.owner} | status ${a.status} | deadline ${a.deadline||"TBD"}`)).join("\n"));
+  const decs=S.decisions.filter(d=>d.state!=="Rejected");if(decs.length)parts.push("DECISIONS:\n"+decs.map(d=>line(d,`${d.decision} | ${d.state}`)).join("\n"));
+  const cons=S.concerns.filter(c=>c.status!=="Resolved");if(cons.length)parts.push("OPEN CONCERNS:\n"+cons.map(c=>line(c,`${c.stakeholder}: ${c.concern}`)).join("\n"));
+  const iss=S.issues.filter(i=>i.status!=="Resolved");if(iss.length)parts.push("OPEN UX ISSUES:\n"+iss.map(i=>line(i,i.title)).join("\n"));
+  if(S.objectives.length)parts.push("OBJECTIVES:\n"+S.objectives.map(o=>line(o,`${o.title} | ${o.source} | ${o.progress}`)).join("\n"));
+  const ms=S.milestones.filter(x=>validIso(x.date));if(ms.length)parts.push("MILESTONES:\n"+ms.map(x=>`${x.date} ${x.title}`).join("\n"));
+  return parts.join("\n\n")||"None yet.";
+}
+function buildPrompt(m,tx){
+  const ux=mType(m)==="UX Team";
+  return `You analyse meeting transcripts for Luis Terán, Senior UX Designer / UX Researcher on the GemBet crypto Sportsbook (Project Ludicrum). Act as a senior UX strategist, product analyst, DesignOps lead and communication coach.
+
+MEETING
+- Date: ${m.date} (weekday ${parse(m.date).toLocaleDateString("en-GB",{weekday:"long"})})
+- Type: ${mType(m)} ${ux?"(general meeting with the UX team; Darren leads UX)":"(Sportsbook meeting with the Product Managers Rodrigo and Raluca)"}
+- Title: ${m.title}
+- Participants given: ${arr(m.participants).join(", ")||"not given, take them from the transcript"}
+
+FOCUS
+${ux?"UX direction, team priorities, design quality, brand alignment, ownership and collaboration, DesignOps.":"Product priorities, Sportsbook strategy, market organization, delivery, deadlines, development readiness, QA, approvals and dependencies."}
+
+RULES
+1. Every finding must be traceable: evidence = speaker + a short quote (under 20 words) or a faithful summary, plus the timestamp only if the transcript shows one. Never invent timestamps.
+2. Never invent decisions, deadlines, commitments or opinions. Missing information is null or "Unknown".
+3. certainty: "Confirmed" (explicitly stated or agreed), "Proposed" (suggested, not approved), "Inferred" (your interpretation), "Needs validation" (insufficient information).
+4. A decision is "Confirmed" only with explicit agreement. Otherwise "Pending" (open question) or "Proposal" (one person's idea). "Rejected" for alternatives explicitly turned down.
+5. Concerns: only for Rodrigo, Raluca or Darren, and only when that person expressed it in this transcript. A request relayed by someone else is not that person's concern.
+6. Priority Critical/High/Medium/Low from user impact, business impact, urgency, dependencies and effort. Do not mark every Product request urgent. Respect any priority order stated by Product.
+7. Resolve relative dates from the meeting date (weeks start on Monday). If a date is unclear, deadline null and explain in deadlineNote.
+8. Do not duplicate. If an item is the same topic as one in EXISTING RECORDS, set existingId to that id, write what changed or was said now in "update", and include status/state/progress only if it changed. Otherwise existingId is null.
+9. Owners and stakeholders: first names (Luis, Rodrigo, Raluca, Darren, or the person's first name). kind: "Commitment" (someone agreed to do it), "Suggestion" (proposed, nobody committed), "Conditional".
+10. Coaching: 3 to 6 meaningful interventions by Luis. Be specific, no generic praise. "better" is a concise, professional English version of what he could have said. dimensions from: Clarity, Confidence, Strategic thinking, Problem-solving, Ownership, Collaboration, Influence, UX proposals.
+11. risks: the 2 to 5 issues that most need Luis's attention (delivery, governance, data, security, alignment), with why it matters.
+12. Write in English. Keep every text field to one or two short sentences. The transcript is automatic and may misspell names; correct obvious ones and flag uncertain ones as "Needs validation".
+
+Issue categories: ${CATS.join(", ")}.
+Project names: ${PROJECTS.join(", ")}.
+
+EXISTING RECORDS
+${existingContext(m)}
+
+Reply with only one JSON object in exactly this shape:
+{"participants":["Full Name"],"topics":["short topic"],"takeaways":["3 to 5 items"],"risks":[{"priority":"Critical","text":"","why":""}],"unresolved":[""],"prep":["checklist item for the next meeting"],
+"actions":[{"existingId":null,"update":"","title":"","owner":"","project":"","priority":"High","status":"To Do","kind":"Commitment","approval":"No","deadline":null,"deadlineNote":"","nextStep":"","certainty":"Confirmed","evidence":""}],
+"decisions":[{"existingId":null,"update":"","decision":"","state":"Confirmed","by":"","feature":"","rationale":"","dependencies":"","evidence":""}],
+"concerns":[{"existingId":null,"update":"","stakeholder":"Rodrigo","concern":"","area":"","impact":"","response":"","status":"Open","certainty":"Confirmed","evidence":""}],
+"issues":[{"existingId":null,"update":"","title":"","category":"Usability","feature":"","userImpact":"","businessImpact":"","approach":"","priority":"Medium","status":"Open","certainty":"Needs validation","evidence":""}],
+"objectives":[{"existingId":null,"update":"","title":"","source":"Stated company goal","initiatives":[""],"progress":"In progress","blockers":[""],"stakeholders":[""],"nextMilestone":"","sequence":"","evidence":""}],
+"reviews":[{"moment":"","dimensions":[""],"said":"","worked":"","improve":"","better":"","benefit":""}],
+"milestones":[{"date":"YYYY-MM-DD","endDate":null,"title":"","kind":"Deadline","project":"","priority":"High","certainty":"Confirmed","source":"who said it"}]}
+Use empty arrays where nothing applies.
+
+TRANSCRIPT
+${tx}`;
+}
+async function analyze(id){
+  const m=meetingOf(id);if(!m||!sample)return;
+  if(transcripts[id]===undefined||transcripts[id]===null){await loadTranscript(id)}
+  const tx=transcripts[id];if(!tx){ui.analysis[id]={msg:"No transcript stored for this meeting."};render();return}
+  ctl=new AbortController();
+  ui.analysis[id]={state:"running",msg:"Waiting for Claude (allow the request if asked)…",chars:0};render();
+  let res;
+  try{
+    res=await sample.json(buildPrompt(m,tx),{modelTier:"complex",signal:ctl.signal,cache:false,onText:({text})=>{const st=ui.analysis[id];if(st&&st.state==="running"){st.msg="Writing the analysis…";st.chars=text.length;renderProgressOnly(id)}}});
+  }catch(e){
+    const code=e&&e.code;
+    const msg={cancelled:"Analysis stopped.",not_granted:"Claude access was not allowed for this page. Allow it from the artifact's permissions to analyse here, or share the transcript in the chat.",rate_limited:"Claude is busy right now. Try again in a minute.",invalid_json:"Claude's answer could not be read. Try again.",prompt_too_large:"The transcript is too long to analyse in one go."}[code]||("The analysis failed"+(e&&e.message?": "+e.message:"."));
+    ui.analysis[id]={msg};render();return;
+  }
+  ui.analysis[id]={state:"running",msg:"Saving records…",chars:0};render();
+  try{const n=await applyAnalysis(m,res);ui.analysis[id]={};ui.imp.createdId=null;toast(`Analysis saved: ${n.created} new, ${n.updated} updated`);ui.tab="summary";go("meeting-"+id.toLowerCase())}
+  catch(e){ui.analysis[id]={msg:"Saving failed partway: "+(e&&e.message||"error")+". Records saved so far are kept."};render()}
+}
+function renderProgressOnly(id){const st=ui.analysis[id];const el=document.querySelector(".progress");if(el&&st)el.outerHTML=progressBlock(st)}
+const S_=v=>typeof v==="string"?v.trim():(v==null?"":String(v));
+const pick=(v,list,dflt)=>list.includes(v)?v:dflt;
+async function applyAnalysis(m,res){
+  if(!res||typeof res!=="object")throw new Error("empty answer");
+  let created=0,updated=0;const made={};
+  const mk=(col)=>{const id=nextId(col,made[col]);(made[col]=made[col]||[]).push({id});return id};
+  const H=[{date:TODAY,change:"Created from transcript analysis",meetingId:m.id}];
+  const doUpdate=async(col,x,fields)=>{
+    const cur=byId(col,x.existingId);if(!cur)return false;
+    const rec=JSON.parse(JSON.stringify(cur));const ch=[];
+    fields.forEach(([k,list])=>{if(x[k]&&(!list||list.includes(x[k]))&&x[k]!==rec[k]){ch.push(`${k}: ${rec[k]||"—"} → ${x[k]}`);rec[k]=x[k]}});
+    rec.meetingIds=[...new Set(arr(rec.meetingIds).concat([m.id]))];
+    const note=`Discussed again ${fmt(m.date,{day:"numeric",month:"short"})}${x.update?": "+S_(x.update):""}${ch.length?" ("+ch.join("; ")+")":""}`;
+    if(col==="actions")rec.notes=arr(rec.notes).concat([{date:m.date,text:note}]);
+    await save(col,rec,note,m.id);updated++;return true};
+  const put=async(col,body)=>{const id=mk(col);body.meetingId=m.id;body.history=H;body.updatedAt=new Date().toISOString();await db.collection(col).doc(id).set(body);created++};
+  for(const a of arr(res.actions)){if(a.existingId&&await doUpdate("actions",a,[["status",STATUS],["priority",PRI],["deadline"]]))continue;
+    await put("actions",{title:S_(a.title),owner:S_(a.owner),project:S_(a.project),priority:pick(a.priority,PRI,"Medium"),status:pick(a.status,STATUS,"To Do"),kind:pick(a.kind,["Commitment","Suggestion","Conditional"],"Commitment"),approval:a.approval==="Yes"?"Yes":"No",deadline:validIso(a.deadline)?a.deadline:null,deadlineNote:S_(a.deadlineNote),nextStep:S_(a.nextStep),certainty:pick(a.certainty,CERT,"Needs validation"),evidence:S_(a.evidence),notes:[]})}
+  for(const d of arr(res.decisions)){if(d.existingId&&await doUpdate("decisions",d,[["state",["Confirmed","Pending","Proposal","Rejected"]]]))continue;
+    await put("decisions",{decision:S_(d.decision),state:pick(d.state,["Confirmed","Pending","Proposal","Rejected"],"Proposal"),by:S_(d.by),feature:S_(d.feature),rationale:S_(d.rationale),dependencies:S_(d.dependencies),implStatus:"Not started",evidence:S_(d.evidence)})}
+  for(const c of arr(res.concerns)){if(!["Rodrigo","Raluca","Darren"].includes(c.stakeholder))continue;if(c.existingId&&await doUpdate("concerns",c,[["status",["Open","Addressing","Resolved"]]]))continue;
+    await put("concerns",{stakeholder:c.stakeholder,concern:S_(c.concern),area:S_(c.area),impact:S_(c.impact),response:S_(c.response),status:pick(c.status,["Open","Addressing","Resolved"],"Open"),certainty:pick(c.certainty,CERT,"Needs validation"),evidence:S_(c.evidence)})}
+  for(const i of arr(res.issues)){if(i.existingId&&await doUpdate("issues",i,[["status",["Open","Validating","Planned","Resolved"]],["priority",PRI]]))continue;
+    await put("issues",{title:S_(i.title),category:pick(i.category,CATS,"Usability"),feature:S_(i.feature),userImpact:S_(i.userImpact),businessImpact:S_(i.businessImpact),approach:S_(i.approach),priority:pick(i.priority,PRI,"Medium"),status:pick(i.status,["Open","Validating","Planned","Resolved"],"Open"),certainty:pick(i.certainty,CERT,"Needs validation"),evidence:S_(i.evidence)})}
+  for(const o of arr(res.objectives)){if(o.existingId&&await doUpdate("objectives",o,[["progress",["Not started","In progress","At risk","Done"]]]))continue;
+    await put("objectives",{title:S_(o.title),source:pick(o.source,["Stated company goal","Proposed UX objective"],"Proposed UX objective"),initiatives:arr(o.initiatives).map(S_).filter(Boolean),progress:pick(o.progress,["Not started","In progress","At risk","Done"],"Not started"),blockers:arr(o.blockers).map(S_).filter(Boolean),stakeholders:arr(o.stakeholders).map(S_).filter(Boolean),nextMilestone:S_(o.nextMilestone),sequence:S_(o.sequence),evidence:S_(o.evidence)})}
+  for(const r of arr(res.reviews))await put("reviews",{moment:S_(r.moment),dimensions:arr(r.dimensions).map(S_).filter(Boolean),said:S_(r.said),worked:S_(r.worked),improve:S_(r.improve),better:S_(r.better),benefit:S_(r.benefit)});
+  for(const x of arr(res.milestones)){if(!validIso(x.date))continue;if(S.milestones.some(e=>e.date===x.date&&S_(e.title).toLowerCase()===S_(x.title).toLowerCase()))continue;
+    await put("milestones",{date:x.date,endDate:validIso(x.endDate)?x.endDate:null,title:S_(x.title),kind:pick(x.kind,["Deadline","Milestone","Out of office","Reminder"],"Milestone"),project:S_(x.project),priority:pick(x.priority,PRI,"Medium"),certainty:pick(x.certainty,CERT,"Needs validation"),source:S_(x.source)})}
+  const cur=JSON.parse(JSON.stringify(meetingOf(m.id)||m));
+  Object.assign(cur,{participants:arr(m.participants).length?m.participants:arr(res.participants).map(S_).filter(Boolean),topics:arr(res.topics).map(S_),takeaways:arr(res.takeaways).map(S_),
+    risks:arr(res.risks).map(r=>({priority:pick(r.priority,PRI,"High"),text:S_(r.text),why:S_(r.why)})),unresolved:arr(res.unresolved).map(S_),prep:arr(res.prep).map(S_),prepDone:[],analysisStatus:"Analyzed",analyzedAt:new Date().toISOString(),analyzedBy:"Claude (in-page)"});
+  await save("meetings",cur,`Analysed: ${created} new records, ${updated} updated`,m.id);
+  return {created,updated};
+}
+
+/* ---------- drawer ---------- */
+function renderOverlay(){
+  const o=document.getElementById("overlay");let h="";const dr=ui.drawer;
+  if(dr){
+    const sch=SCHEMA[dr.col];const r=dr.rec;
+    const field=([k,l,t,opts])=>{const id="fld-"+k;const v=r[k];
+      if(t==="textarea")return `<div class="field"><label for="${id}">${l}</label><textarea class="inp" id="${id}">${esc(v)}</textarea></div>`;
+      if(t==="lines")return `<div class="field"><label for="${id}">${l}</label><textarea class="inp" id="${id}">${esc(arr(v).join("\n"))}</textarea></div>`;
+      if(t==="risks")return `<div class="field"><label for="${id}">${l}</label><textarea class="inp" id="${id}" style="min-height:110px">${esc(arr(v).map(x=>[x.priority,x.text,x.why].join(" | ")).join("\n"))}</textarea></div>`;
+      if(t==="list")return `<div class="field"><label for="${id}">${l}</label><input class="inp" id="${id}" value="${esc(arr(v).join(", "))}"></div>`;
+      if(t==="date")return `<div class="field"><label for="${id}">${l}</label><input type="date" class="inp" id="${id}" value="${esc(validIso(v)?v:"")}"></div>`;
+      if(t==="select")return `<div class="field"><label for="${id}">${l}</label><select class="sel" id="${id}"><option value=""></option>${opts.map(x=>`<option ${v===x?"selected":""}>${esc(x)}</option>`).join("")}</select></div>`;
+      if(t==="meeting")return `<div class="field"><label for="${id}">${l}</label><select class="sel" id="${id}"><option value="">None</option>${[...sortedMeetings()].reverse().map(m=>`<option value="${esc(m.id)}" ${v===m.id?"selected":""}>${esc(fmt(m.date,{day:"numeric",month:"short"}))} · ${esc(m.title)}</option>`).join("")}</select></div>`;
+      return `<div class="field"><label for="${id}">${l}</label><input class="inp" id="${id}" value="${esc(v)}" ${opts?`list="${id}-dl"`:""}>${opts?`<datalist id="${id}-dl">${opts.map(x=>`<option value="${esc(x)}">`).join("")}</datalist>`:""}</div>`};
+    h+=`<div class="scrim" data-close></div><div class="drawer" role="dialog" aria-modal="true" aria-label="${esc(sch.label)}"><header><b>${dr.isNew?"New "+esc(sch.label.toLowerCase()):esc(sch.label)+" "+esc(r.id)}</b><button class="btn icon ghost" data-close aria-label="Close">${I.x}</button></header><div class="dbody">
+    ${sch.fields.map(field).join("")}
+    ${dr.col==="actions"&&!dr.isNew?`<div class="field"><label for="fld-newnote">Notes and updates</label><div class="notes">${arr(r.notes).map(n=>`<div class="note"><span class="d">${esc(n.date)}</span> ${esc(n.text)}</div>`).join("")}</div><div class="row"><input class="inp" id="fld-newnote" placeholder="Add an update" style="flex:1"><button class="btn" data-addnote>Add</button></div></div>`:""}
+    ${!dr.isNew&&arr(r.history).length?`<div class="field"><span class="lab">History</span><div class="notes">${arr(r.history).map(x=>`<div class="note"><span class="d">${esc(x.date)}</span> ${esc(x.change)}</div>`).join("")}</div></div>`:""}
+    ${dr.confirmDelete?`<div class="confirm"><span>Delete ${esc(r.id)} permanently?${dr.col==="meetings"?" Its transcript is deleted too; records created from it are kept.":""}</span><button class="btn danger" data-del-yes>Delete</button><button class="btn ghost" data-del-no>Keep</button></div>`:""}
+    </div><footer>${dr.isNew?"<span></span>":`<button class="btn danger" data-del>Delete</button>`}<div class="row"><button class="btn ghost" data-close>Cancel</button><button class="btn primary" data-savedr>Save</button></div></footer></div>`;
+  }
+  if(ui.toast)h+=`<div class="toast" role="status">${esc(ui.toast)}</div>`;
+  o.innerHTML=h;
+}
+function openDrawer(col,id){
+  const rec=id?JSON.parse(JSON.stringify(byId(col,id)||{})):{id:nextId(col)};
+  if(!id){
+    const mid=ui.view==="meetings"?ui.meetingId:null;
+    if(col==="actions")Object.assign(rec,{status:"To Do",kind:"Commitment",approval:"No",priority:"Medium",owner:"Luis",certainty:"Confirmed"});
+    if(col==="milestones")Object.assign(rec,{date:TODAY,kind:"Milestone",certainty:"Confirmed"});
+    if(col==="decisions")rec.state="Proposal";
+    if(col==="concerns")rec.status="Open";
+    if(col==="issues")Object.assign(rec,{status:"Open",certainty:"Needs validation"});
+    if(col==="objectives")rec.progress="Not started";
+    if(mid)rec.meetingId=mid;
+  }
+  ui.drawer={col,rec,isNew:!id,confirmDelete:false};renderOverlay();
+  setTimeout(()=>{const f=document.querySelector(".drawer .dbody input, .drawer .dbody textarea, .drawer .dbody select");if(f)f.focus()},20);
+}
+function readDrawer(){
+  const dr=ui.drawer;const r=dr.rec;const changed=[];
+  SCHEMA[dr.col].fields.forEach(([k,,t])=>{const el=document.getElementById("fld-"+k);if(!el)return;let v=el.value;
+    if(t==="lines")v=v.split("\n").map(s=>s.trim()).filter(Boolean);
+    else if(t==="list")v=v.split(",").map(s=>s.trim()).filter(Boolean);
+    else if(t==="risks")v=v.split("\n").map(s=>s.trim()).filter(Boolean).map(line=>{const p=line.split("|").map(s=>s.trim());return{priority:PRI.includes(p[0])?p[0]:"Medium",text:p[1]||p[0],why:p[2]||""}});
+    else if(t==="date")v=v||null;
+    else v=v.trim();
+    if(JSON.stringify(v??"")!==JSON.stringify(r[k]??""))changed.push(k);
+    r[k]=v});
+  return changed;
+}
+async function saveDrawer(){
+  const dr=ui.drawer;const changed=readDrawer();const r=dr.rec;
+  if(dr.col==="meetings"&&!validIso(r.date)){toast("A meeting needs a date.");return}
+  if(!dr.isNew&&!changed.length){ui.drawer=null;renderOverlay();return}
+  const prev=byId(dr.col,r.id)||{};
+  let change=dr.isNew?"Created":"Updated "+changed.join(", ");
+  if(changed.includes("status"))change=`Status: ${prev.status||"—"} → ${r.status}`+(changed.length>1?"; updated "+changed.filter(x=>x!=="status").join(", "):"");
+  if(dr.col==="decisions"&&changed.includes("state"))change=`State: ${prev.state||"—"} → ${r.state}`;
+  if(await save(dr.col,r,change,r.meetingId)){ui.drawer=null;toast(dr.isNew?"Added":"Saved")}
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click",async e=>{
+  const t=e.target.closest("button,[data-close],input[type=checkbox]");if(!t)return;
+  const d=t.dataset;
+  if(d.go){if(d.go==="import"){ui.imp.createdId=null}go(d.go);return}
+  if(d.openMeeting!==undefined){if(!d.openMeeting)return;ui.meetingId=d.openMeeting;go("meeting-"+d.openMeeting.toLowerCase());return}
+  if(d.typef){ui.typeF=d.typef;render();return}
+  if(d.tab){ui.tab=d.tab;render();return}
+  if(d.imptype){readImportFields();ui.imp.type=d.imptype;ui.imp.dupOk=false;render();return}
+  if(d.dupok!=null){readImportFields();ui.imp.dupOk=true;render();return}
+  if(d.create!=null){await createMeeting();return}
+  if(d.impReset!=null){ui.imp={type:ui.imp.type,date:TODAY,title:"",participants:"",text:"",fileName:"",busy:false,msg:"",createdId:null,dupOk:false};render();return}
+  if(d.analyze){analyze(d.analyze);return}
+  if(d.stop!=null){if(ctl)ctl.abort();return}
+  if(d.new){openDrawer(d.new);return}
+  if(d.edit){const[c,id]=d.edit.split(":");openDrawer(c,id);return}
+  if(d.close!==undefined&&!t.closest(".dbody")){ui.drawer=null;renderOverlay();return}
+  if(d.savedr!=null){await saveDrawer();return}
+  if(d.del!=null){readDrawer();ui.drawer.confirmDelete=true;renderOverlay();return}
+  if(d.delNo!=null){ui.drawer.confirmDelete=false;renderOverlay();return}
+  if(d.delYes!=null){const{col,rec}=ui.drawer;ui.drawer=null;renderOverlay();try{await db.collection(col).doc(rec.id).delete();if(col==="meetings"){await db.collection("transcripts").doc(rec.id).delete();ui.meetingId=null;pickLatest();go("meetings")}toast(rec.id+" deleted")}catch(err){toast("Could not delete")}return}
+  if(d.addnote!=null){const inp=document.getElementById("fld-newnote");const txt=inp.value.trim();if(!txt)return;readDrawer();const r=ui.drawer.rec;r.notes=arr(r.notes).concat([{date:TODAY,text:txt}]);if(await save("actions",r,"Note added",r.meetingId)){ui.drawer.rec=JSON.parse(JSON.stringify(r));ui.drawer.rec.history=arr(r.history).concat([{date:TODAY,change:"Note added"}]);renderOverlay();toast("Note added")}return}
+  if(d.done){const a=byId("actions",d.done);if(!a)return;const rec=JSON.parse(JSON.stringify(a));const from=rec.status;rec.status=t.checked?"Completed":"To Do";await save("actions",rec,`Status: ${from} → ${rec.status}`,rec.meetingId);return}
+  if(d.prep){const[id,i]=d.prep.split(":");const m=meetingOf(id);if(!m)return;const body=clean(m);let done=arr(body.prepDone);const n=+i;done=t.checked?[...new Set(done.concat([n]))]:done.filter(x=>x!==n);body.prepDone=done;try{await db.collection("meetings").doc(id).set(body)}catch(err){toast("Could not save checklist")}return}
+});
+document.addEventListener("change",async e=>{
+  const t=e.target;
+  if(t.id==="msel"){ui.meetingId=t.value;go("meeting-"+t.value.toLowerCase())}
+  else if(t.dataset.status){const a=byId("actions",t.dataset.status);if(!a)return;const rec=JSON.parse(JSON.stringify(a));const from=rec.status;rec.status=t.value;await save("actions",rec,`Status: ${from} → ${rec.status}`,rec.meetingId);toast(`${rec.id}: ${rec.status}`)}
+  else if(t.id==="imp-file"&&t.files&&t.files[0])readFile(t.files[0]);
+  else if(t.id==="imp-date"){readImportFields();ui.imp.dupOk=false;render()}
+});
+document.addEventListener("input",e=>{if(e.target.id==="imp-text"){const c=document.getElementById("imp-count");if(c)c.textContent=e.target.value.length.toLocaleString("en-GB")+" characters"}});
+document.addEventListener("dragover",e=>{const z=e.target.closest&&e.target.closest("#drop");if(z){e.preventDefault();z.classList.add("over")}});
+document.addEventListener("dragleave",e=>{const z=e.target.closest&&e.target.closest("#drop");if(z)z.classList.remove("over")});
+document.addEventListener("drop",e=>{const z=e.target.closest&&e.target.closest("#drop");if(z){e.preventDefault();z.classList.remove("over");const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)readFile(f)}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&ui.drawer){ui.drawer=null;renderOverlay()}});
+
+readHash();render();boot();
+})();
+</script>
